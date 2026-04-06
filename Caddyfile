@@ -1,0 +1,84 @@
+# P-BANK API リバースプロキシ
+# ドメイン: pbank-api.sastd.com
+
+pbank-api.sastd.com {
+    # API リクエスト
+    handle /api/* {
+        reverse_proxy pbank-api:8080
+    }
+
+    # 管理画面
+    handle /admin/* {
+        reverse_proxy pbank-api:8080
+    }
+
+    # Google OAuth コールバック（Spring Security 標準パス）
+    handle /login/oauth2/* {
+        reverse_proxy pbank-api:8080
+    }
+
+    # Actuator（ヘルスチェック用）
+    handle /actuator/health {
+        reverse_proxy pbank-api:8080
+    }
+
+    # Swagger UI（必要に応じて prod では無効化）
+    handle /swagger-ui/* {
+        respond "Not Found" 404
+    }
+
+    # その他のリクエストは 404
+    handle {
+        respond "Not Found" 404
+    }
+
+    # セキュリティヘッダー
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        Cache-Control "no-store"
+    }
+
+    # アクセスログ
+    log {
+        output file /var/log/caddy/access-pbank-api.log {
+            roll_size 100MiB
+            roll_keep 30
+            roll_keep_for 720h
+        }
+        format json
+    }
+}
+
+# GROWI Wiki リバースプロキシ
+# ドメイン: growi.sastd.com
+
+growi.sastd.com {
+    tls {
+        issuer acme {
+            disable_tlsalpn_challenge
+        }
+    }
+
+    reverse_proxy growi-app:3000
+
+    # セキュリティヘッダー
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Referrer-Policy "strict-origin-when-cross-origin"
+    }
+
+    # アクセスログ
+    log {
+        output file /var/log/caddy/access-growi.log {
+            roll_size 100MiB
+            roll_keep 30
+            roll_keep_for 720h
+        }
+        format json
+    }
+}

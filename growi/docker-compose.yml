@@ -1,0 +1,74 @@
+services:
+  growi:
+    image: growilabs/growi:7
+    container_name: growi-app
+    restart: unless-stopped
+    environment:
+      - MONGO_URI=mongodb://mongo:27017/growi
+      - ELASTICSEARCH_URI=http://elasticsearch:9200/growi
+      - PASSWORD_SEED=${GROWI_PASSWORD_SEED}
+      - APP_SITE_URL=https://growi.sastd.com
+    volumes:
+      - growi_data:/data
+    depends_on:
+      mongo:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+    networks:
+      - growi-network
+      - pbank-network
+
+  mongo:
+    image: mongo:8.0
+    container_name: growi-mongo
+    restart: unless-stopped
+    volumes:
+      - mongo_configdb:/data/configdb
+      - mongo_db:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - growi-network
+
+  elasticsearch:
+    build:
+      context: ./elasticsearch/v9
+    container_name: growi-es
+    restart: unless-stopped
+    environment:
+      - bootstrap.memory_lock=true
+      - ES_JAVA_OPTS=-Xms256m -Xmx256m
+      - LOG4J_FORMAT_MSG_NO_LOOKUPS=true
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - es_data:/usr/share/elasticsearch/data
+      - ./elasticsearch/v9/config/elasticsearch.yml:/usr/share/elasticsearch/config/elasticsearch.yml:ro
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:9200/_cluster/health | grep -q '\"status\":\"green\"\\|\"status\":\"yellow\"'"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+    networks:
+      - growi-network
+
+volumes:
+  growi_data:
+  mongo_configdb:
+  mongo_db:
+  es_data:
+
+networks:
+  growi-network:
+    name: growi-network
+  pbank-network:
+    name: pbank-network
+    external: true
