@@ -6,15 +6,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Infrastructure and static assets for services operated by シンプルアップ工房 on the `sastd.com` domain. Contains:
 
-1. **Caddy reverse proxy config** (`Caddyfile`) — routes traffic for `pbank-api.sastd.com` and `growi.sastd.com`. Includes security headers, HSTS, and JSON access logging.
+1. **Caddy reverse proxy config** (`caddy/growi.caddy`) — `growi.sastd.com` のリバースプロキシ設定。サーバー上の `/etc/caddy/conf.d/` に配置される。P-BANK 側の設定は P-BANK リポジトリで管理。
 2. **GROWI wiki stack** (`growi/`) — Docker Compose setup running GROWI 7, MongoDB 8, and Elasticsearch 9. Site URL: `https://growi.sastd.com`.
 
 ## Architecture
 
-### Caddy routing (`Caddyfile`)
+### Caddy routing (`caddy/growi.caddy`)
 
-- **pbank-api.sastd.com**: Path-based routing to `pbank-api:8080` — `/api/*`, `/admin/*`, `/login/oauth2/*`, `/actuator/health` are proxied; `/swagger-ui/*` returns 404; all other paths return 404.
 - **growi.sastd.com**: Full reverse proxy to `growi-app:3000`. TLS via ACME with ALPN challenge disabled.
+- Caddy コンテナは P-BANK 側 (`/opt/pbank/caddy/docker-compose.yml`) が管理。メイン Caddyfile で `import /etc/caddy/conf.d/*` により各サービスの設定を読み込む。
+- P-BANK 側の設定 (`pbank-api.caddy`) は P-BANK リポジトリで管理。
 
 ### GROWI stack (`growi/docker-compose.yml`)
 
@@ -53,6 +54,6 @@ docker compose -f growi/docker-compose.yml down
 
 ## Notes
 
-- Caddy is deployed as part of the server's Caddy instance; the `Caddyfile` is not run locally.
+- Caddy コンテナは P-BANK 側が管理。GROWI 側は `caddy/growi.caddy` をサーバーの `/etc/caddy/conf.d/growi.caddy` に手動配置する。
 - `GROWI_PASSWORD_SEED` is set in `.env` (git-ignored) and passed to the GROWI container.
 - Elasticsearch JVM heap is set to 256 MB (`ES_JAVA_OPTS=-Xms256m -Xmx256m`).
