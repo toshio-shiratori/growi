@@ -1,0 +1,65 @@
+name: Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      component:
+        description: "デプロイ対象"
+        required: true
+        type: choice
+        options:
+          - all
+          - caddy
+          - growi
+
+env:
+  SSH_HOST: 162.43.27.225
+  SSH_PORT: 20022
+  SSH_USER: sastd
+  REMOTE_CADDY_CONF: /opt/pbank/caddy/conf.d/growi.caddy
+  REMOTE_GROWI_DIR: /opt/growi
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -p ${{ env.SSH_PORT }} ${{ env.SSH_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Deploy Caddy config
+        if: inputs.component == 'caddy' || inputs.component == 'all'
+        run: |
+          scp -P ${{ env.SSH_PORT }} \
+            caddy/growi.caddy \
+            ${{ env.SSH_USER }}@${{ env.SSH_HOST }}:${{ env.REMOTE_CADDY_CONF }}
+
+          ssh -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} \
+            "docker exec pbank-caddy caddy reload --config /etc/caddy/Caddyfile"
+
+      - name: Deploy GROWI stack
+        if: inputs.component == 'growi' || inputs.component == 'all'
+        run: |
+          rsync -av --delete -e "ssh -p ${{ env.SSH_PORT }}" \
+            growi/ \
+            ${{ env.SSH_USER }}@${{ env.SSH_HOST }}:${{ env.REMOTE_GROWI_DIR }}/
+
+          ssh -p ${{ env.SSH_PORT }} ${{ env.SSH_USER }}@${{ env.SSH_HOST }} \
+            "cd ${{ env.REMOTE_GROWI_DIR }} && docker compose pull && docker compose up -d"
+
+      - name: Verify
+        run: |
+          sleep 5
+          if [[ "${{ inputs.component }}" == "caddy" || "${{ inputs.component }}" == "all" ]]; then
+            echo "--- GROWI (Caddy) ---"
+            curl -sf -o /dev/null -w "HTTP %{http_code}" https://growi.sastd.com/ || echo "WARN: GROWI unreachable"
+          fi
+          if [[ "${{ inputs.component }}" == "growi" || "${{ inputs.component }}" == "all" ]]; then
+            echo "--- GROWI (App) ---"
+            curl -sf -o /dev/null -w "HTTP %{http_code}" https://growi.sastd.com/ || echo "WARN: GROWI unreachable"
+          fi
