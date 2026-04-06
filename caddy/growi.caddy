@@ -1,0 +1,30 @@
+# GROWI Wiki リバースプロキシ
+# ドメイン: growi.sastd.com
+
+growi.sastd.com {
+    tls {
+        issuer acme {
+            disable_tlsalpn_challenge
+        }
+    }
+
+    reverse_proxy growi-app:3000
+
+    # セキュリティヘッダー
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Referrer-Policy "strict-origin-when-cross-origin"
+    }
+
+    # アクセスログ
+    log {
+        output file /var/log/caddy/access-growi.log {
+            roll_size 100MiB
+            roll_keep 30
+            roll_keep_for 720h
+        }
+        format json
+    }
+}
