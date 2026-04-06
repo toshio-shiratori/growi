@@ -12,7 +12,10 @@ pbank-api.sastd.com {
         reverse_proxy pbank-api:8080
     }
 
-    # Google OAuth コールバック（Spring Security 標準パス）
+    # Google OAuth（認証開始 + コールバック — Spring Security 標準パス）
+    handle /oauth2/* {
+        reverse_proxy pbank-api:8080
+    }
     handle /login/oauth2/* {
         reverse_proxy pbank-api:8080
     }
